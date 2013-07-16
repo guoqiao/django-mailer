@@ -1,3 +1,4 @@
+import os
 import time
 import smtplib
 import logging
@@ -28,6 +29,9 @@ LOCK_WAIT_TIMEOUT = getattr(settings, "MAILER_LOCK_WAIT_TIMEOUT", -1)
 # The actual backend to use for sending, defaulting to the Django default.
 EMAIL_BACKEND = getattr(settings, "MAILER_EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
 
+PROJ_ROOT = getattr(settings, "PROJ_ROOT", '~')
+
+MAILER_SLEEP_SECS = getattr(settings, "MAILER_SLEEP_SECS", 1)
 
 def prioritize():
     """
@@ -51,9 +55,7 @@ def send_all():
     """
     Send all eligible messages in the queue.
     """
-    root = getattr(settings,'PROJ_ROOT')
-    import os
-    locker = os.path.join(root,"send_mail_lock")
+    locker = os.path.join(PROJ_ROOT,"send_mail_lock")
 
     lock = FileLock(locker)
 
@@ -87,6 +89,7 @@ def send_all():
                 MessageLog.objects.log(message, 1) # @@@ avoid using literal result code
                 message.delete()
                 sent += 1
+                time.sleep(MAILER_SLEEP_SECS)
             except (socket_error, smtplib.SMTPSenderRefused, smtplib.SMTPRecipientsRefused, smtplib.SMTPAuthenticationError), err:
                 message.defer()
                 logging.info("message deferred due to failure: %s" % err)
